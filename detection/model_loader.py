@@ -24,46 +24,58 @@ from .yolo_detector import YOLODetector
 logger = logging.getLogger(__name__)
 
 # Model configurations with enhanced metadata
+# Models are sourced from Hugging Face (Bingsu/adetailer) for reliability
 MODEL_CONFIGS = {
     "yolov8n-face": {
-        "url": "https://github.com/akanametov/yolov8-face/releases/download/v0.0.0/yolov8n-face.pt",
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8n.pt",
         "filename": "yolov8n-face.pt",
-        "sha256": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",  # YOLOv8n-face model checksum
+        "sha256": None,  # Checksum verification disabled for HF models
         "size_mb": 6.2,
-        "description": "YOLOv8 Nano Face Detection Model",
+        "description": "YOLOv8 Nano Face Detection Model (from Bingsu/adetailer)",
         "input_size": 640,
         "classes": ["face"],
         "architecture": "yolov8n",
         "task": "face_detection"
     },
     "yolov8s-face": {
-        "url": "https://github.com/akanametov/yolov8-face/releases/download/v0.0.0/yolov8s-face.pt", 
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8s.pt",
         "filename": "yolov8s-face.pt",
-        "sha256": "b1c2d3e4f5a6789012345678901234567890bcdefg234567890bcdefg234567",  # YOLOv8s-face model checksum
+        "sha256": None,  # Checksum verification disabled for HF models
         "size_mb": 22.5,
-        "description": "YOLOv8 Small Face Detection Model",
+        "description": "YOLOv8 Small Face Detection Model (from Bingsu/adetailer)",
         "input_size": 640,
         "classes": ["face"],
         "architecture": "yolov8s",
         "task": "face_detection"
     },
+    "yolov8m-face": {
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt",
+        "filename": "yolov8m-face.pt",
+        "sha256": None,  # Checksum verification disabled for HF models
+        "size_mb": 52.0,
+        "description": "YOLOv8 Medium Face Detection Model (from Bingsu/adetailer)",
+        "input_size": 640,
+        "classes": ["face"],
+        "architecture": "yolov8m",
+        "task": "face_detection"
+    },
     "yolov8n": {
-        "url": "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt",
+        "url": "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt",
         "filename": "yolov8n.pt",
-        "sha256": "c1d2e3f4a5b6789012345678901234567890cdefgh34567890cdefgh34567890",  # YOLOv8n general model checksum
+        "sha256": None,  # Checksum verification disabled
         "size_mb": 6.2,
         "description": "YOLOv8 Nano General Object Detection",
         "input_size": 640,
         "classes": ["person"],  # Among 80 COCO classes, focusing on person
-        "architecture": "yolov8n", 
+        "architecture": "yolov8n",
         "task": "object_detection"
     },
     "hand_yolov8n": {
         "url": None,  # Custom model - no auto-download
         "filename": "hand_yolov8n.pt",
-        "sha256": "d1e2f3a4b5c6789012345678901234567890defghi4567890defghi4567890a",  # Hand YOLOv8n model checksum
+        "sha256": None,
         "size_mb": 6.2,
-        "description": "YOLOv8 Nano Hand Detection Model (Custom)",
+        "description": "YOLOv8 Nano Hand Detection Model (Custom - manual install required)",
         "input_size": 640,
         "classes": ["hand"],
         "architecture": "yolov8n",
@@ -165,13 +177,88 @@ class ModelManager:
             logger.error(f"Failed to ensure model availability for {model_name}: {e}")
             return False
     
-    async def _download_model(self, model_name: str) -> bool:
+    def download_model_sync(self, model_name: str) -> bool:
         """
-        Download a model from its registered URL.
-        
+        Synchronous model download (ComfyUI-compatible).
+
         Args:
             model_name: Name of the model to download
-            
+
+        Returns:
+            True if download successful, False otherwise
+        """
+        try:
+            import requests
+            from tqdm import tqdm
+
+            with self.download_lock:
+                # Check if already downloading
+                if model_name in self.download_status:
+                    if self.download_status[model_name] == "downloading":
+                        logger.info(f"Model {model_name} already being downloaded")
+                        return False
+
+                # Mark as downloading
+                self.download_status[model_name] = "downloading"
+
+            model_info = self.model_registry[model_name]
+            url = model_info["url"]
+            filename = model_info["filename"]
+            model_path = self.models_dir / filename
+
+            logger.info(f"Downloading model {model_name} from {url}")
+
+            # Set headers for Hugging Face compatibility
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+
+            # Download with progress tracking
+            response = requests.get(url, stream=True, timeout=self.download_timeout, headers=headers, allow_redirects=True)
+
+            if response.status_code == 200:
+                total_size = int(response.headers.get('content-length', 0))
+                block_size = 8192
+
+                with open(model_path, 'wb') as f:
+                    if total_size > 0:
+                        with tqdm(total=total_size, unit='B', unit_scale=True, desc=filename) as pbar:
+                            for chunk in response.iter_content(chunk_size=block_size):
+                                if chunk:
+                                    f.write(chunk)
+                                    pbar.update(len(chunk))
+                    else:
+                        for chunk in response.iter_content(chunk_size=block_size):
+                            if chunk:
+                                f.write(chunk)
+
+                # Verify download (skip checksum for now as they may not be accurate)
+                if model_path.exists() and model_path.stat().st_size > 0:
+                    logger.info(f"Successfully downloaded model {model_name} ({model_path.stat().st_size} bytes)")
+                    self.download_status[model_name] = "completed"
+                    return True
+                else:
+                    logger.error(f"Downloaded file is empty or doesn't exist: {model_path}")
+                    self.download_status[model_name] = "failed"
+                    return False
+
+            else:
+                logger.error(f"Failed to download model {model_name}: HTTP {response.status_code}")
+                self.download_status[model_name] = "failed"
+                return False
+
+        except Exception as e:
+            logger.error(f"Download failed for model {model_name}: {e}")
+            self.download_status[model_name] = "failed"
+            return False
+
+    async def _download_model(self, model_name: str) -> bool:
+        """
+        Download a model from its registered URL (async version).
+
+        Args:
+            model_name: Name of the model to download
+
         Returns:
             True if download successful, False otherwise
         """
@@ -185,51 +272,51 @@ class ModelManager:
                         while self.download_status.get(model_name) == "downloading":
                             await asyncio.sleep(1)
                         return self.download_status.get(model_name) == "completed"
-                
+
                 # Mark as downloading
                 self.download_status[model_name] = "downloading"
-            
+
             model_info = self.model_registry[model_name]
             url = model_info["url"]
             filename = model_info["filename"]
             model_path = self.models_dir / filename
-            
+
             logger.info(f"Downloading model {model_name} from {url}")
-            
+
             # Download with progress tracking
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.download_timeout)) as session:
                 async with session.get(url) as response:
                     if response.status == 200:
                         total_size = int(response.headers.get('content-length', 0))
                         downloaded = 0
-                        
+
                         with open(model_path, 'wb') as f:
                             async for chunk in response.content.iter_chunked(8192):
                                 f.write(chunk)
                                 downloaded += len(chunk)
-                                
+
                                 # Log progress every 10MB
                                 if downloaded % (10 * 1024 * 1024) == 0 or downloaded == total_size:
                                     if total_size > 0:
                                         progress = (downloaded / total_size) * 100
                                         logger.info(f"Download progress: {progress:.1f}% ({downloaded}/{total_size} bytes)")
-                        
+
                         # Verify download
                         if self.verify_checksums:
                             if not await self._verify_model_integrity(model_name, model_path):
                                 model_path.unlink()  # Remove corrupted file
                                 self.download_status[model_name] = "failed"
                                 return False
-                        
+
                         logger.info(f"Successfully downloaded model {model_name}")
                         self.download_status[model_name] = "completed"
                         return True
-                        
+
                     else:
                         logger.error(f"Failed to download model {model_name}: HTTP {response.status}")
                         self.download_status[model_name] = "failed"
                         return False
-                        
+
         except asyncio.TimeoutError:
             logger.error(f"Download timeout for model {model_name}")
             self.download_status[model_name] = "failed"
@@ -281,11 +368,11 @@ class ModelManager:
     def load_model_efficiently(self, model_name: str, device: str = "auto") -> Optional[YOLODetector]:
         """
         Load a model efficiently with caching and memory management.
-        
+
         Args:
             model_name: Name of the model to load
             device: Device to load the model on
-            
+
         Returns:
             Loaded YOLODetector instance or None if failed
         """
@@ -296,31 +383,46 @@ class ModelManager:
                     self.model_access_times[model_name] = time.time()
                     logger.info(f"Using cached model: {model_name}")
                     return self.loaded_models[model_name]
-                
+
                 # Check if model file exists
                 model_path = self.models_dir / self._get_model_filename(model_name)
                 if not model_path.exists():
-                    logger.error(f"Model file not found: {model_path}")
-                    return None
-                
+                    logger.warning(f"Model file not found: {model_path}")
+                    # Try to download it synchronously
+                    if model_name in self.model_registry:
+                        model_info = self.model_registry[model_name]
+                        if model_info["url"] is not None:
+                            logger.info(f"Attempting to download model: {model_name}")
+                            if self.download_model_sync(model_name):
+                                logger.info(f"Successfully downloaded {model_name}")
+                            else:
+                                logger.error(f"Failed to download model: {model_name}")
+                                return None
+                        else:
+                            logger.error(f"No download URL available for model: {model_name}")
+                            return None
+                    else:
+                        logger.error(f"Unknown model: {model_name}")
+                        return None
+
                 # Manage cache size before loading new model
                 self._manage_cache_size()
-                
+
                 # Load model
                 logger.info(f"Loading model {model_name} from {model_path}")
                 detector = YOLODetector(str(model_path), device=device)
-                
+
                 if detector.load_model():
                     # Add to cache
                     self.loaded_models[model_name] = detector
                     self.model_access_times[model_name] = time.time()
-                    
+
                     logger.info(f"Successfully loaded and cached model: {model_name}")
                     return detector
                 else:
                     logger.error(f"Failed to load model: {model_name}")
                     return None
-                    
+
         except Exception as e:
             logger.error(f"Model loading failed for {model_name}: {e}")
             return None

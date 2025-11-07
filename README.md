@@ -49,9 +49,24 @@ git clone https://github.com/KyouichiAmagase/ComfyUI-UniversalDetailer.git
 cd ComfyUI-UniversalDetailer/
 pip install -r requirements.txt
 
-# 4. Restart ComfyUI
+# 4. Download YOLOv detection models (REQUIRED)
+python setup_models.py
+
+# 5. Restart ComfyUI
 # Universal Detailer node will be available in the "image/postprocessing" category
 ```
+
+### Model Setup
+
+**IMPORTANT**: YOLOv models are required for detection. See [MODEL_SETUP.md](MODEL_SETUP.md) for detailed instructions.
+
+**Quick model download**:
+```bash
+cd ComfyUI/custom_nodes/ComfyUI-UniversalDetailer
+python setup_models.py
+```
+
+Models will be downloaded to the `models/` directory (~35 MB total).
 
 ### Basic Usage
 1. Add "Universal Detailer" node to your ComfyUI workflow
@@ -126,8 +141,9 @@ Universal Detailer is an advanced ComfyUI custom node that extends FaceDetailer 
 ## Documentation
 
 ### 📚 Available Documentation
+- **[MODEL_SETUP.md](MODEL_SETUP.md)** - YOLOv models installation guide (START HERE)
 - **[SPECIFICATIONS.md](SPECIFICATIONS.md)** - Complete technical specifications
-- **[API_REFERENCE.md](API_REFERENCE.md)** - Detailed API documentation  
+- **[API_REFERENCE.md](API_REFERENCE.md)** - Detailed API documentation
 - **[EXAMPLES.md](EXAMPLES.md)** - Usage examples and workflows
 - **[DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)** - Development and contribution guide
 - **[CODE_REVIEW_FIXES_REPORT.md](CODE_REVIEW_FIXES_REPORT.md)** - Implementation details

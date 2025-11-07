@@ -559,7 +559,6 @@ class UniversalDetailerNode:
             logger.error(f"Error loading detection model {model_name}: {e}")
             return None
     
-    @lru_cache(maxsize=32)
     def _determine_optimal_batch_size(self, height: int, width: int, channels: int) -> int:
         """Determine optimal batch size based on image dimensions and available memory."""
         try:

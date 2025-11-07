@@ -180,14 +180,13 @@ class YOLODetector:
             logger.error(f"Detection failed: {e}")
             return []
     
-    @lru_cache(maxsize=64)
     def _optimize_image_for_detection(self, image: np.ndarray) -> np.ndarray:
         """
         Optimize image for YOLO detection.
-        
+
         Args:
             image: Input image array
-            
+
         Returns:
             Optimized image array
         """
@@ -260,17 +259,17 @@ class YOLODetector:
             
         return detections
     
-    @lru_cache(maxsize=128)
     def _map_class_to_type(self, class_name: str) -> str:
         """
         Map YOLO class names to detection types.
-        
+
         Args:
             class_name: YOLO class name
-            
+
         Returns:
             Detection type string
         """
+        # Use a simple static mapping (no caching needed for this simple operation)
         class_name_lower = class_name.lower()
         
         if "face" in class_name_lower or "head" in class_name_lower:

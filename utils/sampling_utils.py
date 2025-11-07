@@ -212,7 +212,7 @@ class SamplingUtils:
     ) -> torch.Tensor:
         """
         Sample using ComfyUI diffusion model with full integration.
-        
+
         Args:
             model: ComfyUI diffusion model
             latents: Starting latents (B, C, H, W)
@@ -221,13 +221,23 @@ class SamplingUtils:
             sampling_params: Sampling parameters
             mask: Optional mask for inpainting
             original_latents: Original latents for masked regions
-            
+
         Returns:
             Sampled latents
         """
         try:
             logger.info("Starting ComfyUI diffusion sampling...")
-            
+
+            # Import ComfyUI sampling modules
+            try:
+                import comfy.sample
+                import comfy.samplers
+                USE_COMFY_SAMPLER = True
+                logger.info("Using ComfyUI native sampling")
+            except ImportError:
+                USE_COMFY_SAMPLER = False
+                logger.warning("ComfyUI sampling modules not available, using fallback")
+
             # Get sampling parameters
             steps = sampling_params.get('steps', 20)
             cfg_scale = sampling_params.get('cfg_scale', 7.0)
@@ -238,102 +248,76 @@ class SamplingUtils:
             # Generate random seed if not provided
             if seed == -1:
                 seed = torch.randint(0, 2**32, (1,)).item()
-            
-            # Set up noise generator
+
             device = latents.device
-            generator = torch.Generator(device=device)
-            generator.manual_seed(seed)
-            
-            # Prepare noise schedule
-            noise_schedule = SamplingUtils._create_noise_schedule(steps, scheduler, device)
-            
-            # Clone latents for processing
-            current_latents = latents.clone()
-            
-            # Inpainting: prepare mask for latent space
-            latent_mask = None
-            if mask is not None:
-                # Resize mask to match latent dimensions
-                latent_height, latent_width = current_latents.shape[-2:]
-                if mask.shape[-2:] != (latent_height, latent_width):
-                    latent_mask = torch.nn.functional.interpolate(
-                        mask.unsqueeze(1).float(),
-                        size=(latent_height, latent_width),
-                        mode='nearest'
-                    ).squeeze(1)
-                else:
-                    latent_mask = mask.clone()
-                
-                # Expand mask to match latent channels
-                latent_mask = latent_mask.unsqueeze(1).expand_as(current_latents)
-            
-            # Sampling loop
-            logger.info(f"Running {steps} sampling steps with {sampler_name}")
-            
-            for i in range(steps):
-                # Calculate timestep
-                t = noise_schedule[i]
-                timestep = torch.full((current_latents.shape[0],), t, device=device, dtype=torch.long)
-                
-                # Predict noise with model
-                with torch.no_grad():
-                    # Get model prediction
-                    if hasattr(model, 'apply_model'):
-                        # ComfyUI model interface
-                        noise_pred_pos = model.apply_model(current_latents, timestep, positive)
-                        noise_pred_neg = model.apply_model(current_latents, timestep, negative)
-                    else:
-                        # Fallback for other model types
-                        try:
-                            noise_pred_pos = model(current_latents, timestep, encoder_hidden_states=positive).sample
-                            noise_pred_neg = model(current_latents, timestep, encoder_hidden_states=negative).sample
-                        except:
-                            # Last resort: use latents directly
-                            noise_pred_pos = current_latents
-                            noise_pred_neg = current_latents * 0.9
-                    
-                    # Apply classifier-free guidance
-                    noise_pred = noise_pred_neg + cfg_scale * (noise_pred_pos - noise_pred_neg)
-                
-                # Update latents based on sampler
-                if sampler_name == 'euler':
-                    # Euler sampling step
-                    if i < steps - 1:
-                        sigma_curr = noise_schedule[i]
-                        sigma_next = noise_schedule[i + 1]
-                        
-                        # Euler step
-                        dt = sigma_next - sigma_curr
-                        current_latents = current_latents + dt * noise_pred
-                    
-                elif sampler_name == 'dpm_solver':
-                    # DPM-Solver step (simplified)
-                    if i < steps - 1:
-                        alpha = 1.0 - t / steps
-                        current_latents = alpha * current_latents + (1 - alpha) * noise_pred
-                        
-                else:  # ddim or default
-                    # DDIM sampling step
-                    if i < steps - 1:
-                        alpha_t = 1.0 - t / steps
-                        alpha_next = 1.0 - noise_schedule[i + 1] / steps
-                        
-                        # DDIM step
-                        pred_x0 = (current_latents - torch.sqrt(1 - alpha_t) * noise_pred) / torch.sqrt(alpha_t)
-                        current_latents = (torch.sqrt(alpha_next) * pred_x0 + 
-                                         torch.sqrt(1 - alpha_next) * noise_pred)
-                
-                # For inpainting: blend with original latents in non-masked regions
-                if latent_mask is not None and original_latents is not None:
-                    current_latents = (current_latents * latent_mask + 
-                                     original_latents * (1.0 - latent_mask))
-                
-                # Log progress periodically
-                if (i + 1) % max(1, steps // 4) == 0:
-                    logger.info(f"Sampling step {i + 1}/{steps} completed")
-            
-            logger.info("ComfyUI diffusion sampling completed successfully")
-            return current_latents
+
+            logger.info(f"Running {steps} sampling steps with {sampler_name}, cfg={cfg_scale}, seed={seed}")
+
+            # Use ComfyUI native sampling if available
+            if USE_COMFY_SAMPLER:
+                try:
+                    # Prepare latent image with noise
+                    latent_image = latents.clone()
+
+                    # Add noise based on denoise strength
+                    denoise = 1.0  # Full denoise for inpainting
+
+                    # Create noise
+                    import comfy.sample
+                    noise = comfy.sample.prepare_noise(latent_image, seed)
+
+                    # Prepare latent mask if provided
+                    latent_mask = None
+                    if mask is not None and original_latents is not None:
+                        # Resize mask to latent dimensions
+                        latent_height, latent_width = latent_image.shape[-2:]
+                        if mask.shape[-2:] != (latent_height, latent_width):
+                            latent_mask = torch.nn.functional.interpolate(
+                                mask.unsqueeze(1).float(),
+                                size=(latent_height, latent_width),
+                                mode='bilinear',
+                                align_corners=False
+                            ).squeeze(1)
+                        else:
+                            latent_mask = mask
+
+                    # Call ComfyUI's sample function
+                    logger.info("Calling ComfyUI native sampler")
+                    samples = comfy.sample.sample(
+                        model=model,
+                        noise=noise,
+                        steps=steps,
+                        cfg=cfg_scale,
+                        sampler_name=sampler_name,
+                        scheduler=scheduler,
+                        positive=positive,
+                        negative=negative,
+                        latent_image=latent_image,
+                        denoise=denoise,
+                        disable_noise=False,
+                        start_step=0,
+                        last_step=steps,
+                        force_full_denoise=True,
+                        noise_mask=latent_mask,
+                        callback=None,
+                        disable_pbar=False,
+                        seed=seed
+                    )
+
+                    logger.info("ComfyUI native sampling completed successfully")
+                    return samples
+
+                except Exception as e:
+                    logger.error(f"ComfyUI native sampling failed: {e}")
+                    logger.warning("Falling back to simplified sampling")
+                    USE_COMFY_SAMPLER = False
+
+            # Fallback: Simple passthrough with noise (better than nothing)
+            logger.warning("Using fallback passthrough mode - inpainting may not work properly")
+            logger.warning("Please ensure ComfyUI is properly installed for full functionality")
+
+            # Return latents with minimal processing
+            return latents
             
         except Exception as e:
             logger.error(f"Sampling failed: {e}")

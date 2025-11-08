@@ -246,7 +246,8 @@ def create_table_from_markdown(doc, table_lines):
     doc.add_paragraph()  # Add space after table
 
 if __name__ == '__main__':
-    # Convert both guides
+    # Convert all guides
     parse_markdown_to_docx('HAND_FIXING_GUIDE.md', 'HAND_FIXING_GUIDE.docx')
     parse_markdown_to_docx('FIXING_HAND_ANATOMY.md', 'FIXING_HAND_ANATOMY.docx')
+    parse_markdown_to_docx('INSTALLATION_TROUBLESHOOTING.md', 'INSTALLATION_TROUBLESHOOTING.docx')
     print("\nConversion complete!")

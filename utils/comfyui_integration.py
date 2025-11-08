@@ -70,33 +70,50 @@ class ComfyUIHelper:
     def prepare_image_for_vae(image: torch.Tensor) -> torch.Tensor:
         """
         Prepare image tensor for VAE encoding.
-        
+
         Args:
             image: Image tensor in ComfyUI format (B, H, W, C)
-            
+
         Returns:
             Image tensor ready for VAE (B, C, H, W) in [-1, 1] range
         """
         try:
+            logger.info(f"Preparing image for VAE, input shape: {image.shape}")
+
+            # Ensure we have 4D tensor
+            if len(image.shape) != 4:
+                raise ValueError(f"Expected 4D tensor, got shape: {image.shape}")
+
+            batch, height, width, channels = image.shape
+
+            # Validate dimensions
+            if channels != 3:
+                raise ValueError(f"Expected 3 channels, got {channels}")
+            if height == 0 or width == 0:
+                raise ValueError(f"Invalid dimensions: {height}x{width}")
+
             # Convert to BCHW format
-            if len(image.shape) == 4 and image.shape[3] == 3:
-                image = ComfyUIHelper.convert_tensor_format(image, "BHWC", "BCHW")
-            
+            logger.info(f"Converting BHWC {image.shape} to BCHW")
+            image = image.permute(0, 3, 1, 2)  # BHWC -> BCHW
+            logger.info(f"After permute: {image.shape}")
+
             # Ensure float32
             image = image.float()
-            
+
             # Normalize to [-1, 1] range if needed
             if image.max() > 1.0:
                 image = image / 255.0
-            
+
             # Convert [0, 1] to [-1, 1]
             image = image * 2.0 - 1.0
-            
+
+            logger.info(f"VAE input prepared: {image.shape}, range: [{image.min():.3f}, {image.max():.3f}]")
             return image
-            
+
         except Exception as e:
             logger.error(f"Image preparation for VAE failed: {e}")
-            return image
+            logger.error(f"Input shape was: {image.shape if hasattr(image, 'shape') else 'unknown'}")
+            raise
     
     @staticmethod
     def prepare_image_from_vae(image: torch.Tensor) -> torch.Tensor:

@@ -92,12 +92,12 @@ class UniversalDetailerNode:
         "hand": {
             "fast": "hand_yolov8n",
             "balanced": "hand_yolov8n",
-            "quality": "hand_yolov8n"
+            "quality": "hand_yolov8s"
         },
         "finger": {
             "fast": "hand_yolov8n",  # Hand model also detects fingers
             "balanced": "hand_yolov8n",
-            "quality": "hand_yolov8n"
+            "quality": "hand_yolov8s"
         }
     }
 

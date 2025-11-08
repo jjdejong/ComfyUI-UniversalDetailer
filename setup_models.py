@@ -50,6 +50,18 @@ MODELS = {
         "size_mb": 52.0,
         "description": "YOLOv8 Medium Face Detection (Highest accuracy)"
     },
+    "hand_yolov8n": {
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt",
+        "filename": "hand_yolov8n.pt",
+        "size_mb": 6.2,
+        "description": "YOLOv8 Nano Hand Detection (Fast)"
+    },
+    "hand_yolov8s": {
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8s.pt",
+        "filename": "hand_yolov8s.pt",
+        "size_mb": 21.5,
+        "description": "YOLOv8 Small Hand Detection (High accuracy)"
+    },
     "yolov8n": {
         "url": "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt",
         "filename": "yolov8n.pt",

@@ -71,14 +71,25 @@ MODEL_CONFIGS = {
         "task": "object_detection"
     },
     "hand_yolov8n": {
-        "url": None,  # Custom model - no auto-download
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt",
         "filename": "hand_yolov8n.pt",
         "sha256": None,
         "size_mb": 6.2,
-        "description": "YOLOv8 Nano Hand Detection Model (Custom - manual install required)",
+        "description": "YOLOv8 Nano Hand Detection Model (from Bingsu/adetailer)",
         "input_size": 640,
         "classes": ["hand"],
         "architecture": "yolov8n",
+        "task": "hand_detection"
+    },
+    "hand_yolov8s": {
+        "url": "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8s.pt",
+        "filename": "hand_yolov8s.pt",
+        "sha256": None,
+        "size_mb": 21.5,
+        "description": "YOLOv8 Small Hand Detection Model - Higher Accuracy (from Bingsu/adetailer)",
+        "input_size": 640,
+        "classes": ["hand"],
+        "architecture": "yolov8s",
         "task": "hand_detection"
     }
 }

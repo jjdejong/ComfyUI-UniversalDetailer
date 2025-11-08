@@ -1,10 +1,43 @@
-# Installation Troubleshooting: Git Authentication Issues
+# Installation Troubleshooting Guide
 
-**If git clone asks for username/password, use one of these alternative methods:**
+**Common installation issues and their solutions**
 
 ---
 
-## Problem: Git Clone Requests Authentication
+## Quick Fix for Common Errors
+
+### Error 1: "This action is not allowed with this security level configuration"
+**Where:** ComfyUI Manager when trying to enter git URL
+
+**Solution:**
+- ✅ **Use the search box** in ComfyUI Manager instead of entering URLs
+- ✅ Search for "controlnet aux" to find MeshGraphormer
+- ✅ Or use Manual Download method (see Solution 2 below)
+
+### Error 2: Git Clone Asks for Username/Password
+**Where:** Terminal/command line when running `git clone`
+
+**Solution:**
+- ✅ **Use ComfyUI Manager search** (easiest - see Solution 1)
+- ✅ **Download ZIP manually** from GitHub (see Solution 2)
+- ✅ Skip git entirely (see Solutions 1 & 2)
+
+---
+
+## Problem 1: ComfyUI Manager Security Restriction
+
+When trying to install custom nodes by entering a git URL in ComfyUI Manager, you see:
+```
+"This action is not allowed with this security level configuration."
+```
+
+**This is a security feature** that restricts manual URL entry. You can only install nodes from the Manager's official trusted list.
+
+**Solution:** Jump to [Solution 1](#solution-1-use-comfyui-manager-easiest---recommended) and use the **search function** instead of entering URLs.
+
+---
+
+## Problem 2: Git Clone Requests Authentication
 
 When running commands like:
 ```bash
@@ -33,20 +66,40 @@ You may be prompted for username and password. This can happen due to:
 
 ### Step 2: Install Nodes Through Manager
 
+**IMPORTANT: Use the search function, don't enter git URLs directly!**
+
 1. **In ComfyUI web interface**, click the **Manager** button
 2. Click **"Install Custom Nodes"**
-3. Search for the node you need:
-   - Search "MeshGraphormer" → Click "Install"
-   - Search "BMAB" → Click "Install"
-   - Search "SAM2" → Click "Install"
+3. **Use the search box** to find nodes:
+   - Search "**ControlNet Auxiliary**" or "**controlnet aux**" → Find "ComfyUI's ControlNet Auxiliary Preprocessors" → Click "Install"
+   - Search "**BMAB**" → Click "Install"
+   - Search "**SAM2**" → Click "Install"
    - etc.
 4. Restart ComfyUI when prompted
+
+**⚠️ Security Restriction Warning**
+
+If you try to **manually enter a git URL** in ComfyUI Manager, you may see:
+```
+"This action is not allowed with this security level configuration."
+```
+
+**Solution:**
+- ✅ **Use the search function** instead of entering URLs
+- ✅ The node must be in Manager's official list to install this way
+- ✅ If not found in search, use **Manual Download** (Solution 2 below)
+
+**How to search effectively:**
+- For MeshGraphormer: Search "**controlnet aux**" or "**auxiliary**"
+- For Impact Pack nodes: Search "**impact**"
+- Use partial names if full name doesn't work
 
 **Advantages:**
 - ✅ No git commands needed
 - ✅ No authentication issues
 - ✅ Automatic dependency installation
 - ✅ Easy updates through GUI
+- ✅ Only nodes from trusted sources
 
 ---
 

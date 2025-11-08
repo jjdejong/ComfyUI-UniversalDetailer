@@ -351,11 +351,53 @@ A 4px blur is barely visible on a 4K image but very soft on a 512px image. Adapt
 - You want to detect hands but only process faces
 - Debugging: Check detection without inpainting
 
-**Note**: Even with auto_fix disabled, masks are still generated and output.
+### Detection-Only Mode (Fast Mask Output)
+
+**⚡ IMPORTANT**: Setting **both** `auto_face_fix=False` AND `auto_hand_fix=False` enables **detection-only mode**:
+- **Skips inpainting entirely** - returns immediately after mask generation
+- **~100x faster** - No sampling steps, VAE encoding/decoding
+- **Outputs**: Original image + all masks + detection info
+- **Use for**: Getting masks quickly without waiting for slow inpainting
+
+**Example use cases**:
+```python
+# Get masks quickly for review
+{
+    "target_parts": "face,hand",
+    "auto_face_fix": False,     # Disable face inpainting
+    "auto_hand_fix": False,     # Disable hand inpainting
+    # ... other detection params
+}
+# Result: Original image + masks in ~1-2 seconds (no inpainting wait!)
+```
+
+**Workflow tip**:
+1. Run with both auto-fix disabled to quickly check detection quality
+2. Review the mask outputs to see if detections are good
+3. If satisfied, enable auto-fix and run again for final inpainting
+
+**Note**: Even with auto_fix disabled, masks are always generated and output.
 
 ---
 
 ## Recommended Combinations
+
+### Detection Only (Get Masks Immediately)
+```python
+{
+    "target_parts": "face,hand",
+    "model_quality": "fast",
+    "confidence_threshold": 0.4,
+    "mask_padding": 32,
+    "mask_blur": 8,
+    "auto_face_fix": False,     # SKIP INPAINTING
+    "auto_hand_fix": False      # SKIP INPAINTING
+}
+```
+**Use for**: Getting masks in 1-2 seconds without waiting for inpainting
+**Key**: Both auto-fix disabled = detection-only mode
+
+---
 
 ### Fast Preview / Testing
 ```python

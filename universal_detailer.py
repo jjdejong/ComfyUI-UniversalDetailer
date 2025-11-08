@@ -538,12 +538,16 @@ class UniversalDetailerNode:
         # Validate mask blur
         blur = kwargs.get("mask_blur", 8)
         validated["mask_blur"] = max(0, min(50, blur))
-        
+
+        # Validate boolean flags
+        validated["auto_face_fix"] = kwargs.get("auto_face_fix", True)
+        validated["auto_hand_fix"] = kwargs.get("auto_hand_fix", True)
+
         # Copy other parameters as-is
-        for key in ["detection_model", "target_parts", "seed", "sampler_name", "scheduler"]:
+        for key in ["detection_model", "target_parts", "seed", "sampler_name", "scheduler", "model_quality"]:
             if key in kwargs:
                 validated[key] = kwargs[key]
-        
+
         return validated
     
     def _load_detection_model(self, model_name: str):
@@ -1007,14 +1011,19 @@ class UniversalDetailerNode:
                 
                 # Generate masks for this image
                 combined_mask, face_mask, hand_mask = self._generate_masks(
-                    detections, 
-                    single_image.shape, 
-                    mask_padding, 
+                    detections,
+                    single_image.shape,
+                    mask_padding,
                     mask_blur
                 )
-                
-                # Process inpainting if detections found
-                if torch.any(combined_mask > 0):
+
+                # Check if inpainting should be performed
+                auto_face_fix = validated_params.get('auto_face_fix', True)
+                auto_hand_fix = validated_params.get('auto_hand_fix', True)
+                should_inpaint = auto_face_fix or auto_hand_fix
+
+                # Process inpainting if detections found AND auto-fix is enabled
+                if torch.any(combined_mask > 0) and should_inpaint:
                     logger.info(f"Processing inpainting for image {batch_idx + 1} with {len(detections)} detections")
                     processed_single = self._inpaint_regions(
                         single_image,
@@ -1027,7 +1036,10 @@ class UniversalDetailerNode:
                         **validated_params
                     )
                 else:
-                    logger.info(f"No detections for image {batch_idx + 1}, keeping original")
+                    if not should_inpaint:
+                        logger.info(f"Skipping inpainting for image {batch_idx + 1} (auto-fix disabled, detection-only mode)")
+                    else:
+                        logger.info(f"No detections for image {batch_idx + 1}, keeping original")
                     processed_single = single_image
                 
                 # Collect results

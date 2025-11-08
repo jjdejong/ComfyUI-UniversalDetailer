@@ -94,7 +94,7 @@ class ComfyUIHelper:
 
             # Convert to BCHW format
             logger.info(f"Converting BHWC {image.shape} to BCHW")
-            image = image.permute(0, 3, 1, 2)  # BHWC -> BCHW
+            image = image.permute(0, 3, 1, 2).contiguous()  # BHWC -> BCHW
             logger.info(f"After permute: {image.shape}")
 
             # Ensure float32
@@ -157,24 +157,51 @@ class ComfyUIHelper:
         try:
             # Prepare image for VAE
             vae_input = ComfyUIHelper.prepare_image_for_vae(image)
-            
-            # Encode to latent space
+
+            # Ensure tensor is contiguous and on correct device
+            vae_input = vae_input.contiguous()
+            if hasattr(vae, 'device'):
+                vae_input = vae_input.to(vae.device)
+
+            logger.info(f"VAE type: {type(vae).__name__}")
+            logger.info(f"VAE has first_stage_model: {hasattr(vae, 'first_stage_model')}")
+            logger.info(f"Encoding with VAE, input: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}, contiguous: {vae_input.is_contiguous()}")
+            logger.info(f"Input tensor stride: {vae_input.stride()}")
+
+            # Encode to latent space using ComfyUI VAE interface
             with torch.no_grad():
+                # ComfyUI VAEs have an encode method that takes pixels
                 if hasattr(vae, 'encode'):
-                    latents = vae.encode(vae_input)
+                    try:
+                        # First try the standard encode method
+                        logger.info("Calling vae.encode()...")
+                        latents = vae.encode(vae_input)
+                    except Exception as encode_error:
+                        logger.warning(f"vae.encode() failed: {encode_error}")
+                        # Try accessing first_stage_model if available
+                        if hasattr(vae, 'first_stage_model'):
+                            logger.info("Trying vae.first_stage_model.encode()...")
+                            latents = vae.first_stage_model.encode(vae_input)
+                        else:
+                            raise
+
+                    # Handle different return types (some return distributions)
                     if hasattr(latents, 'latent_dist'):
                         latents = latents.latent_dist.sample()
                     elif hasattr(latents, 'sample'):
                         latents = latents.sample()
                 else:
                     # Fallback for different VAE interfaces
+                    logger.info("Using vae() call...")
                     latents = vae(vae_input)
-            
+
             logger.info(f"VAE encoding: {vae_input.shape} -> {latents.shape}")
             return latents
-            
+
         except Exception as e:
             logger.error(f"VAE encoding failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # Return dummy latents as fallback
             batch_size, height, width, channels = image.shape
             return torch.randn(batch_size, 4, height // 8, width // 8, device=image.device)

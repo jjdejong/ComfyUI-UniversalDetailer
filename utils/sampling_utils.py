@@ -208,7 +208,8 @@ class SamplingUtils:
         negative: Any,
         sampling_params: Dict[str, Any],
         mask: Optional[torch.Tensor] = None,
-        original_latents: Optional[torch.Tensor] = None
+        original_latents: Optional[torch.Tensor] = None,
+        pbar: Any = None
     ) -> torch.Tensor:
         """
         Sample using ComfyUI diffusion model with full integration.
@@ -221,6 +222,7 @@ class SamplingUtils:
             sampling_params: Sampling parameters
             mask: Optional mask for inpainting
             original_latents: Original latents for masked regions
+            pbar: Optional ComfyUI progress bar
 
         Returns:
             Sampled latents
@@ -281,6 +283,14 @@ class SamplingUtils:
                         else:
                             latent_mask = mask
 
+                    # Create progress callback
+                    callback = None
+                    if pbar is not None:
+                        def progress_callback(step, x0, x, total_steps):
+                            """Update progress bar during sampling."""
+                            pbar.update_absolute(step + 1, total_steps)
+                        callback = progress_callback
+
                     # Call ComfyUI's sample function
                     logger.info("Calling ComfyUI native sampler")
                     samples = comfy.sample.sample(
@@ -299,7 +309,7 @@ class SamplingUtils:
                         last_step=steps,
                         force_full_denoise=True,
                         noise_mask=latent_mask,
-                        callback=None,
+                        callback=callback,
                         disable_pbar=False,
                         seed=seed
                     )

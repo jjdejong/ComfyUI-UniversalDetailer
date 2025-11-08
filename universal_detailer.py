@@ -25,13 +25,21 @@ import time
 from pathlib import Path
 from functools import lru_cache, wraps
 
-# Import detection and masking components
-from .detection.yolo_detector import YOLODetector
-from .masking.mask_generator import MaskGenerator
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Import ComfyUI progress bar
+try:
+    import comfy.utils
+    COMFY_PROGRESS_AVAILABLE = True
+except ImportError:
+    COMFY_PROGRESS_AVAILABLE = False
+    logger.warning("ComfyUI progress bar not available")
+
+# Import detection and masking components
+from .detection.yolo_detector import YOLODetector
+from .masking.mask_generator import MaskGenerator
 
 # Performance optimization decorators
 def profile_performance(func):
@@ -246,11 +254,20 @@ class UniversalDetailerNode:
                 memory_manager = MemoryManager()
             except ImportError:
                 memory_manager = None
-            
+
+            # Initialize ComfyUI progress bar
+            pbar = None
+            if COMFY_PROGRESS_AVAILABLE:
+                try:
+                    pbar = comfy.utils.ProgressBar(steps)
+                    logger.info("ComfyUI progress bar initialized")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize progress bar: {e}")
+
             # Monitor memory usage throughout processing
             if memory_manager:
                 memory_manager.log_memory_usage("start processing")
-            
+
             start_time = time.time()
             logger.info("Starting Universal Detailer processing...")
             logger.info(f"Target parts: {target_parts}")
@@ -299,7 +316,7 @@ class UniversalDetailerNode:
             # Process images efficiently (batch or sequential based on memory)
             processed_results = self._process_batch_efficiently(
                 image, detector, target_parts_list, validated_params,
-                model, vae, positive, negative, memory_manager
+                model, vae, positive, negative, memory_manager, pbar
             )
             
             processed_image, combined_masks, face_masks, hand_masks, detections = processed_results
@@ -659,10 +676,10 @@ class UniversalDetailerNode:
             return empty_mask, empty_mask, empty_mask
     
     @profile_performance
-    def _inpaint_regions(self, image: torch.Tensor, masks: torch.Tensor, model, vae, positive, negative, **kwargs):
+    def _inpaint_regions(self, image: torch.Tensor, masks: torch.Tensor, model, vae, positive, negative, pbar=None, **kwargs):
         """
         Inpaint the masked regions using ComfyUI models.
-        
+
         Args:
             image: Input image tensor (B, H, W, C)
             masks: Mask tensor (B, H, W) - 1.0 for areas to inpaint
@@ -670,8 +687,9 @@ class UniversalDetailerNode:
             vae: ComfyUI VAE encoder/decoder
             positive: Positive conditioning
             negative: Negative conditioning
+            pbar: Optional ComfyUI progress bar
             **kwargs: Additional inpainting parameters
-        
+
         Returns:
             Inpainted image tensor (B, H, W, C)
         """
@@ -730,7 +748,8 @@ class UniversalDetailerNode:
                     negative=neg_cond,
                     sampling_params=sampling_params,
                     mask=masks,
-                    original_latents=original_latents
+                    original_latents=original_latents,
+                    pbar=pbar
                 )
                 
                 # Step 5: Blend sampled latents with original (for better seamless integration)
@@ -812,16 +831,17 @@ class UniversalDetailerNode:
             return original
     
     def _process_batch_efficiently(
-        self, 
-        image: torch.Tensor, 
-        detector, 
-        target_parts_list: List[str], 
+        self,
+        image: torch.Tensor,
+        detector,
+        target_parts_list: List[str],
         validated_params: Dict[str, Any],
-        model, 
-        vae, 
-        positive, 
-        negative, 
-        memory_manager=None
+        model,
+        vae,
+        positive,
+        negative,
+        memory_manager=None,
+        pbar=None
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, List[Dict]]:
         """
         Process batch of images efficiently based on available memory.
@@ -890,6 +910,7 @@ class UniversalDetailerNode:
                         vae,
                         positive,
                         negative,
+                        pbar=pbar,
                         **validated_params
                     )
                 else:

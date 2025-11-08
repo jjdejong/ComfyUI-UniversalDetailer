@@ -1,0 +1,281 @@
+{
+  "last_node_id": 18,
+  "last_link_id": 28,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [50, 100],
+      "size": {"0": 315, "1": 314},
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["example.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "UltralyticsDetectorProvider",
+      "pos": [50, 450],
+      "size": {"0": 315, "1": 78},
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {"name": "BBOX_DETECTOR", "type": "BBOX_DETECTOR", "links": [2], "slot_index": 0},
+        {"name": "SEGM_DETECTOR", "type": "SEGM_DETECTOR", "links": null}
+      ],
+      "properties": {"Node name for S&R": "UltralyticsDetectorProvider"},
+      "widgets_values": ["bbox/hand_yolov8s.pt"]
+    },
+    {
+      "id": 3,
+      "type": "MeshGraphormer-ImpactDetector-DepthMapPreprocessor",
+      "pos": [400, 100],
+      "size": {"0": 400, "1": 150},
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 1},
+        {"name": "bbox_detector", "type": "BBOX_DETECTOR", "link": 2}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [3], "slot_index": 0},
+        {"name": "POSE_KEYPOINT", "type": "POSE_KEYPOINT", "links": null},
+        {"name": "MASK", "type": "MASK", "links": [4], "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "MeshGraphormer-ImpactDetector-DepthMapPreprocessor"},
+      "widgets_values": [0.5, 10, 512, "enable"]
+    },
+    {
+      "id": 4,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 580],
+      "size": {"0": 315, "1": 98},
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [5], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [6, 7], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [8, 9], "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "CheckpointLoaderSimple"},
+      "widgets_values": ["realisticVisionV60B1_v51VAE.safetensors"]
+    },
+    {
+      "id": 5,
+      "type": "ControlNetLoader",
+      "pos": [50, 720],
+      "size": {"0": 315, "1": 58},
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET", "links": [10], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "ControlNetLoader"},
+      "widgets_values": ["control_v11f1p_sd15_depth.pth"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [400, 300],
+      "size": {"0": 400, "1": 150},
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 6}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [11], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "CLIPTextEncode"},
+      "widgets_values": ["detailed hand, five fingers, proper thumb, natural anatomy"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [400, 500],
+      "size": {"0": 400, "1": 150},
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 7}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [12], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "CLIPTextEncode"},
+      "widgets_values": ["extra fingers, missing fingers, deformed hand, bad anatomy"]
+    },
+    {
+      "id": 8,
+      "type": "ControlNetApply",
+      "pos": [850, 300],
+      "size": {"0": 315, "1": 98},
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "conditioning", "type": "CONDITIONING", "link": 11},
+        {"name": "control_net", "type": "CONTROL_NET", "link": 10},
+        {"name": "image", "type": "IMAGE", "link": 3}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [13], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "ControlNetApply"},
+      "widgets_values": [0.9]
+    },
+    {
+      "id": 9,
+      "type": "VAEEncodeForInpaint",
+      "pos": [850, 100],
+      "size": {"0": 315, "1": 98},
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "pixels", "type": "IMAGE", "link": 1},
+        {"name": "vae", "type": "VAE", "link": 8},
+        {"name": "mask", "type": "MASK", "link": 4}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [14], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "VAEEncodeForInpaint"},
+      "widgets_values": [6]
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [1200, 100],
+      "size": {"0": 315, "1": 474},
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 5},
+        {"name": "positive", "type": "CONDITIONING", "link": 13},
+        {"name": "negative", "type": "CONDITIONING", "link": 12},
+        {"name": "latent_image", "type": "LATENT", "link": 14}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [15], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "KSampler"},
+      "widgets_values": [12345, "randomize", 35, 8.0, "euler_a", "normal", 0.85]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [1550, 100],
+      "size": {"0": 210, "1": 46},
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 15},
+        {"name": "vae", "type": "VAE", "link": 9}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [16], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "VAEDecode"}
+    },
+    {
+      "id": 12,
+      "type": "SaveImage",
+      "pos": [1800, 100],
+      "size": {"0": 315, "1": 270},
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 16}
+      ],
+      "properties": {},
+      "widgets_values": ["hand_fixed_simple"]
+    },
+    {
+      "id": 13,
+      "type": "PreviewImage",
+      "pos": [850, 450],
+      "size": {"0": 315, "1": 246},
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 3}
+      ],
+      "properties": {"Node name for S&R": "PreviewImage"}
+    },
+    {
+      "id": 14,
+      "type": "Note",
+      "pos": [50, 820],
+      "size": {"0": 400, "1": 120},
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "properties": {"text": ""},
+      "widgets_values": ["SIMPLIFIED MeshGraphormer Workflow\n\nThis uses MeshGraphormer-ImpactDetector which combines:\n- Hand detection (YOLO)\n- Depth map generation (MeshGraphormer)\n- All in one convenient node!\n\nKey Settings:\n- Detection threshold: 0.5\n- Dilation: 10 (mask expansion)\n- Resolution: 512\n- ControlNet strength: 0.9\n- Denoise: 0.85\n- Steps: 35"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 3, 0, "IMAGE"],
+    [2, 2, 0, 3, 1, "BBOX_DETECTOR"],
+    [3, 3, 0, 8, 2, "IMAGE"],
+    [4, 3, 2, 9, 2, "MASK"],
+    [5, 4, 0, 10, 0, "MODEL"],
+    [6, 4, 1, 6, 0, "CLIP"],
+    [7, 4, 1, 7, 0, "CLIP"],
+    [8, 4, 2, 9, 1, "VAE"],
+    [9, 4, 2, 11, 1, "VAE"],
+    [10, 5, 0, 8, 1, "CONTROL_NET"],
+    [11, 6, 0, 8, 0, "CONDITIONING"],
+    [12, 7, 0, 10, 2, "CONDITIONING"],
+    [13, 8, 0, 10, 1, "CONDITIONING"],
+    [14, 9, 0, 10, 3, "LATENT"],
+    [15, 10, 0, 11, 0, "LATENT"],
+    [16, 11, 0, 12, 0, "IMAGE"]
+  ],
+  "groups": [
+    {
+      "title": "Input & Detection",
+      "bounding": [40, 30, 780, 510],
+      "color": "#3f789e"
+    },
+    {
+      "title": "Models",
+      "bounding": [40, 540, 330, 260],
+      "color": "#8A8A00"
+    },
+    {
+      "title": "Conditioning & ControlNet",
+      "bounding": [390, 240, 810, 480],
+      "color": "#88AA88"
+    },
+    {
+      "title": "Sampling & Output",
+      "bounding": [1190, 30, 940, 560],
+      "color": "#A87A3A"
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9090909090909091,
+      "offset": [-30, 0]
+    }
+  },
+  "version": 0.4
+}

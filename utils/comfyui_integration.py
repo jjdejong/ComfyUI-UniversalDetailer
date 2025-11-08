@@ -236,6 +236,34 @@ class ComfyUIHelper:
             Image tensor (B, H, W, C)
         """
         try:
+            # Detect VAE dtype and device
+            vae_dtype = None
+            vae_device = None
+
+            if hasattr(vae, 'first_stage_model'):
+                for param in vae.first_stage_model.parameters():
+                    vae_dtype = param.dtype
+                    vae_device = param.device
+                    break
+            elif hasattr(vae, 'parameters'):
+                for param in vae.parameters():
+                    vae_dtype = param.dtype
+                    vae_device = param.device
+                    break
+
+            if vae_device is None and hasattr(vae, 'device'):
+                vae_device = vae.device
+
+            # Convert latents to VAE's dtype and device
+            if vae_dtype is not None:
+                latents = latents.to(dtype=vae_dtype)
+            if vae_device is not None:
+                latents = latents.to(device=vae_device)
+
+            latents = latents.contiguous()
+
+            logger.info(f"Decoding latents: {latents.shape}, dtype: {latents.dtype}, device: {latents.device}")
+
             # Decode from latent space
             with torch.no_grad():
                 if hasattr(vae, 'decode'):
@@ -243,15 +271,17 @@ class ComfyUIHelper:
                 else:
                     # Fallback for different VAE interfaces
                     decoded = vae(latents, decode=True)
-            
+
             # Convert back to ComfyUI format
             image = ComfyUIHelper.prepare_image_from_vae(decoded)
-            
-            logger.info(f"VAE decoding: {latents.shape} -> {image.shape}")
+
+            logger.info(f"VAE decoding successful: {latents.shape} -> {image.shape}")
             return image
-            
+
         except Exception as e:
             logger.error(f"VAE decoding failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # Return dummy image as fallback
             batch_size, channels, height, width = latents.shape
             return torch.zeros(batch_size, height * 8, width * 8, 3, device=latents.device)

@@ -61,16 +61,6 @@ CATEGORY = "image/postprocessing"
 
 ### Optional Inputs
 
-#### `detection_model`
-- **Type**: `STRING`
-- **Description**: Detection model type for part identification
-- **Default**: `"yolov8n-face"`
-- **Options**: 
-  - `"yolov8n-face"`: Lightweight face detection
-  - `"yolov8s-face"`: Standard face detection
-  - `"hand_yolov8n"`: Hand detection model
-  - `"yolov8n-pose"`: Pose detection model
-
 #### `target_parts`
 - **Type**: `STRING`
 - **Description**: Comma-separated list of parts to detect and correct
@@ -79,8 +69,18 @@ CATEGORY = "image/postprocessing"
 - **Valid Parts**:
   - `face`: Human faces
   - `hand`: Hands and fingers
-  - `finger`: Specific finger detection
-  - `person`: Full person detection
+  - `finger`: Specific finger detection (uses hand model)
+- **See**: [PARAMETERS.md](PARAMETERS.md) for detailed recommendations
+
+#### `model_quality`
+- **Type**: `CHOICE`
+- **Description**: Detection model quality/speed trade-off
+- **Default**: `"fast"`
+- **Options**:
+  - `"fast"`: YOLOv8n models (fastest, 6MB each)
+  - `"balanced"`: YOLOv8n models (same as fast)
+  - `"quality"`: YOLOv8s models (higher accuracy, 22MB each)
+- **Auto-selects appropriate models** based on target_parts
 
 #### `confidence_threshold`
 - **Type**: `FLOAT`
@@ -88,7 +88,8 @@ CATEGORY = "image/postprocessing"
 - **Default**: `0.5`
 - **Range**: `0.1` to `0.95`
 - **Step**: `0.05`
-- **Usage**: Higher values = fewer, more confident detections
+- **Recommended**: `0.3-0.5` for most images
+- **Usage**: Lower = more detections (including false positives), higher = fewer, more confident detections
 
 #### `mask_padding`
 - **Type**: `INT`
@@ -96,15 +97,17 @@ CATEGORY = "image/postprocessing"
 - **Default**: `32`
 - **Range**: `0` to `128`
 - **Step**: `4`
-- **Usage**: Larger values include more surrounding context
+- **Recommended**: `24-48` for faces, `40-64` for hands
+- **Usage**: Provides surrounding context for inpainting
 
 #### `inpaint_strength`
 - **Type**: `FLOAT`
-- **Description**: Strength of inpainting effect
+- **Description**: Strength of inpainting effect (denoising strength)
 - **Default**: `0.75`
 - **Range**: `0.1` to `1.0`
 - **Step**: `0.05`
-- **Usage**: Higher values = more dramatic changes
+- **Recommended**: `0.6-0.85` for most use cases
+- **Usage**: Higher values = more dramatic changes, 1.0 = complete regeneration
 
 #### `steps`
 - **Type**: `INT`
@@ -112,7 +115,8 @@ CATEGORY = "image/postprocessing"
 - **Default**: `20`
 - **Range**: `1` to `100`
 - **Step**: `1`
-- **Usage**: More steps = higher quality, longer processing
+- **Recommended**: `15-30` (diminishing returns above 30)
+- **Usage**: More steps = higher quality but longer processing time
 
 #### `cfg_scale`
 - **Type**: `FLOAT`
@@ -120,48 +124,63 @@ CATEGORY = "image/postprocessing"
 - **Default**: `7.0`
 - **Range**: `1.0` to `30.0`
 - **Step**: `0.5`
-- **Usage**: Higher values = stronger prompt adherence
+- **Recommended**: `3.0-8.0` for inpainting (lower than typical generation)
+- **Usage**: Controls prompt adherence vs natural blending
+- **Note**: For photorealistic inpainting, 3-5 often works better than 7+
 
 #### `seed`
 - **Type**: `INT`
 - **Description**: Random seed for reproducible results
 - **Default**: `-1` (random)
 - **Range**: `-1` or any positive integer
-- **Usage**: Same seed = same results
+- **Usage**: Same seed + same settings = same results
 
 #### `sampler_name`
 - **Type**: `STRING`
 - **Description**: Sampling algorithm for inpainting
 - **Default**: `"euler"`
-- **Options**: All ComfyUI standard samplers
-  - `"euler"`, `"euler_ancestral"`, `"heun"`, `"dpm_2"`, etc.
+- **Options**:
+  - `"euler"`: Fast, deterministic (recommended)
+  - `"euler_ancestral"`: Stochastic, more variation
+  - `"heun"`: High quality, slower
+  - `"dpm_2"`: Efficient, often higher quality
+  - `"dpm_2_ancestral"`: Stochastic variant
+- **Recommended**: `"euler"` for most use, `"dpm_2"` for quality
 
 #### `scheduler`
 - **Type**: `STRING`
 - **Description**: Noise schedule for sampling
 - **Default**: `"normal"`
-- **Options**: All ComfyUI standard schedulers
-  - `"normal"`, `"karras"`, `"exponential"`, etc.
+- **Options**:
+  - `"normal"`: Standard linear schedule
+  - `"karras"`: Often produces better quality
+  - `"exponential"`: Different noise distribution
+  - `"sgm_uniform"`: Specialized schedule
+- **Recommended**: `"normal"` or `"karras"`
 
 #### `auto_face_fix`
 - **Type**: `BOOLEAN`
-- **Description**: Automatically fix detected faces
+- **Description**: Automatically process detected faces with inpainting
 - **Default**: `True`
 - **Options**: `True` / `False`
+- **Usage**: Set to False to detect faces without processing them
 
 #### `auto_hand_fix`
 - **Type**: `BOOLEAN`
-- **Description**: Automatically fix detected hands
+- **Description**: Automatically process detected hands with inpainting
 - **Default**: `True`
 - **Options**: `True` / `False`
+- **Usage**: Set to False to detect hands without processing them
 
 #### `mask_blur`
 - **Type**: `INT`
-- **Description**: Blur radius for mask edges
-- **Default**: `4`
-- **Range**: `0` to `20`
+- **Description**: Blur radius for mask edges (automatically scales with image resolution)
+- **Default**: `8`
+- **Range**: `0` to `50`
 - **Step**: `1`
+- **Recommended**: `8-15` (auto-scales for large images)
 - **Usage**: Higher values = softer mask transitions
+- **Note**: Automatically multiplied 2-4x for high-resolution images
 
 ## Output Types
 

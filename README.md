@@ -155,9 +155,10 @@ The node automatically manages these YOLO models:
 
 ### 📚 Available Documentation
 - **[MODEL_SETUP.md](MODEL_SETUP.md)** - YOLOv models installation guide (START HERE)
-- **[SPECIFICATIONS.md](SPECIFICATIONS.md)** - Complete technical specifications
+- **[PARAMETERS.md](PARAMETERS.md)** - **Complete parameter guide with recommendations** ⭐
 - **[API_REFERENCE.md](API_REFERENCE.md)** - Detailed API documentation
 - **[EXAMPLES.md](EXAMPLES.md)** - Usage examples and workflows
+- **[SPECIFICATIONS.md](SPECIFICATIONS.md)** - Complete technical specifications
 - **[DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)** - Development and contribution guide
 - **[CODE_REVIEW_FIXES_REPORT.md](CODE_REVIEW_FIXES_REPORT.md)** - Implementation details
 

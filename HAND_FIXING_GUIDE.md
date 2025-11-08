@@ -375,8 +375,8 @@ MeshGraphormer creates a 3D hand pose model, which guides the image generation t
 
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer.git
-cd ComfyUI-MeshGraphormer
+git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
+cd comfyui_controlnet_aux
 pip install -r requirements.txt
 
 # Download ControlNet Depth model
@@ -666,7 +666,7 @@ Negative: "deformed, extra fingers, extra limbs, bad anatomy, bad hands, bad fac
 - **BMAB**: https://github.com/portu-sim/comfyui_bmab
 - **Flux Fill**: https://github.com/kijai/ComfyUI-FluxFill
 - **SAM2**: https://github.com/neverbiasu/ComfyUI-SAM2
-- **MeshGraphormer**: https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer
+- **ControlNet Aux (MeshGraphormer)**: https://github.com/Fannovel16/comfyui_controlnet_aux
 
 ### Community Resources
 - **ComfyUI Examples**: https://comfyworkflows.com (search "hand fix")

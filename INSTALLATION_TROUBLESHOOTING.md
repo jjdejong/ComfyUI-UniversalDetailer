@@ -8,7 +8,7 @@
 
 When running commands like:
 ```bash
-git clone https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer.git
+git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
 ```
 
 You may be prompted for username and password. This can happen due to:
@@ -54,9 +54,9 @@ You may be prompted for username and password. This can happen due to:
 
 For any custom node that's giving git authentication errors:
 
-### Example: Installing ComfyUI-MeshGraphormer
+### Example: Installing ControlNet Auxiliary Preprocessors (includes MeshGraphormer)
 
-1. **Open browser** and go to: https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer
+1. **Open browser** and go to: https://github.com/Fannovel16/comfyui_controlnet_aux
 
 2. **Download as ZIP**:
    - Click the green "Code" button
@@ -65,15 +65,15 @@ For any custom node that's giving git authentication errors:
 
 3. **Extract ZIP**:
    - Extract the downloaded ZIP file
-   - You'll get a folder named `ComfyUI-MeshGraphormer-main`
+   - You'll get a folder named `comfyui_controlnet_aux-main`
 
 4. **Move to ComfyUI**:
-   - Rename folder to remove `-main`: `ComfyUI-MeshGraphormer`
-   - Move the folder to: `ComfyUI/custom_nodes/ComfyUI-MeshGraphormer/`
+   - Rename folder to remove `-main`: `comfyui_controlnet_aux`
+   - Move the folder to: `ComfyUI/custom_nodes/comfyui_controlnet_aux/`
 
 5. **Install dependencies**:
    ```bash
-   cd ComfyUI/custom_nodes/ComfyUI-MeshGraphormer/
+   cd ComfyUI/custom_nodes/comfyui_controlnet_aux/
    pip install -r requirements.txt
    ```
 
@@ -85,7 +85,7 @@ Replace the repository URL with any of these:
 - **BMAB**: https://github.com/portu-sim/comfyui_bmab
 - **SAM2**: https://github.com/neverbiasu/ComfyUI-SAM2
 - **FluxFill**: https://github.com/kijai/ComfyUI-FluxFill
-- **MeshGraphormer**: https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer
+- **ControlNet Aux (MeshGraphormer)**: https://github.com/Fannovel16/comfyui_controlnet_aux
 
 ---
 
@@ -99,7 +99,7 @@ git config --global credential.helper ""
 
 # Then try the clone again
 cd ComfyUI/custom_nodes/
-git clone https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer.git
+git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
 ```
 
 ### Option B: Use Git with Different Protocol
@@ -108,7 +108,7 @@ Some networks block HTTPS git but allow HTTP:
 
 ```bash
 # Try with explicit HTTP (less secure but works on some networks)
-git clone http://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer.git
+git clone http://github.com/Fannovel16/comfyui_controlnet_aux.git
 ```
 
 ---

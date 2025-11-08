@@ -51,18 +51,41 @@ Regenerates hand with correct anatomy
 - 8GB+ VRAM (10GB+ recommended)
 - Your existing FaceDetailer setup (for faces)
 
-### Step 1: Install MeshGraphormer Node
+### Step 1: Install ControlNet Auxiliary Preprocessors (includes MeshGraphormer)
 
+**MeshGraphormer is part of the ControlNet Auxiliary Preprocessors package.**
+
+**Option A: Using ComfyUI Manager (Recommended)**
+```
+1. Open ComfyUI
+2. Click "Manager" button
+3. Click "Install Custom Nodes"
+4. Search for "ControlNet Auxiliary Preprocessors"
+5. Click "Install" on "ComfyUI's ControlNet Auxiliary Preprocessors"
+6. Restart ComfyUI
+```
+
+**Option B: Manual Installation**
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/ZHO-ZHO-ZHO/ComfyUI-MeshGraphormer.git
-cd ComfyUI-MeshGraphormer
+git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
+cd comfyui_controlnet_aux
 pip install -r requirements.txt
 
 # Restart ComfyUI
 ```
 
-The node will automatically download the MeshGraphormer model (~200MB) on first use.
+**Option C: Manual Download (No Git)**
+```
+1. Visit: https://github.com/Fannovel16/comfyui_controlnet_aux
+2. Click "Code" → "Download ZIP"
+3. Extract to: ComfyUI/custom_nodes/comfyui_controlnet_aux/
+4. Open terminal in that folder
+5. Run: pip install -r requirements.txt
+6. Restart ComfyUI
+```
+
+The MeshGraphormer model will automatically download (~200MB) on first use.
 
 ### Step 2: Install ControlNet Depth Model
 
@@ -141,11 +164,12 @@ Here's the exact workflow to implement:
 │ PART 2: GENERATE CORRECT HAND ANATOMY                          │
 └─────────────────────────────────────────────────────────────────┘
 
-[4] MeshGraphormer-hand (from ComfyUI-MeshGraphormer)
+[4] MeshGraphormer Hand Refiner (from ControlNet Auxiliary Preprocessors)
+    # Also known as: MeshGraphormer-DepthMapPreprocessor
     ├─ image: [3] cropped hands
-    └─ output_type: "depth"  # Creates depth map from 3D hand mesh
+    └─ Output: depth map showing anatomically correct hand structure
          │
-         └──> [Hand Depth Map - anatomically correct]
+         └──> [Hand Depth Map - anatomically correct with 5 fingers]
 
 [5] ImageResize
     ├─ image: [4] depth map

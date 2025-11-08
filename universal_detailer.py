@@ -140,8 +140,8 @@ class UniversalDetailerNode:
                     {"default": True}
                 ),
                 "mask_blur": (
-                    "INT", 
-                    {"default": 4, "min": 0, "max": 20, "step": 1}
+                    "INT",
+                    {"default": 8, "min": 0, "max": 50, "step": 1}
                 ),
             }
         }
@@ -206,7 +206,7 @@ class UniversalDetailerNode:
         scheduler: str = "normal",
         auto_face_fix: bool = True,
         auto_hand_fix: bool = True,
-        mask_blur: int = 4
+        mask_blur: int = 8
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, str]:
         """
         Main processing function for universal detection and correction.
@@ -426,8 +426,8 @@ class UniversalDetailerNode:
         validated["cfg_scale"] = max(1.0, min(30.0, cfg_scale))
         
         # Validate mask blur
-        blur = kwargs.get("mask_blur", 4)
-        validated["mask_blur"] = max(0, min(20, blur))
+        blur = kwargs.get("mask_blur", 8)
+        validated["mask_blur"] = max(0, min(50, blur))
         
         # Copy other parameters as-is
         for key in ["detection_model", "target_parts", "seed", "sampler_name", "scheduler"]:
@@ -844,7 +844,7 @@ class UniversalDetailerNode:
             batch_size, height, width, channels = image.shape
             confidence_threshold = validated_params.get('confidence_threshold', 0.5)
             mask_padding = validated_params.get('mask_padding', 32)
-            mask_blur = validated_params.get('mask_blur', 4)
+            mask_blur = validated_params.get('mask_blur', 8)
             
             # Initialize result tensors
             processed_images = []
@@ -945,7 +945,7 @@ class UniversalDetailerNode:
         try:
             confidence_threshold = validated_params.get('confidence_threshold', 0.5)
             mask_padding = validated_params.get('mask_padding', 32)
-            mask_blur = validated_params.get('mask_blur', 4)
+            mask_blur = validated_params.get('mask_blur', 8)
             
             # Convert image tensor to numpy for detection
             image_np = self._tensor_to_numpy(image[0])  # Process first image in batch

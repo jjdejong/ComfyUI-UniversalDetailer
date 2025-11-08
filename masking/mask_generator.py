@@ -216,21 +216,51 @@ class MaskGenerator:
     
     def _apply_blur(self, mask: np.ndarray, blur_radius: int) -> np.ndarray:
         """
-        Apply Gaussian blur to mask edges.
-        
+        Apply Gaussian blur to mask edges with adaptive sizing.
+
         Args:
             mask: Input mask
-            blur_radius: Blur radius
-        
+            blur_radius: Blur radius (will be scaled adaptively for large images)
+
         Returns:
             Blurred mask
         """
         if blur_radius <= 0:
             return mask
-        
-        # Apply Gaussian blur
-        kernel_size = blur_radius * 2 + 1
-        return cv2.GaussianBlur(mask, (kernel_size, kernel_size), blur_radius)
+
+        # Calculate adaptive blur based on image size for better edge blending
+        # For large images (>1024px), we need proportionally more blur to avoid visible edges
+        height, width = mask.shape
+        image_size = max(height, width)
+
+        # Adaptive scaling: larger images need proportionally more blur
+        if image_size > 2048:
+            # For very large images (2K+), scale blur significantly (3-4x)
+            scale_factor = max(3.0, min(4.0, image_size / 1024.0))
+        elif image_size > 1024:
+            # For large images (1K-2K), scale blur moderately (2-3x)
+            scale_factor = max(2.0, min(3.0, image_size / 1024.0))
+        else:
+            # For small images (<1K), use blur as-is
+            scale_factor = 1.0
+
+        effective_blur = int(blur_radius * scale_factor)
+
+        # Ensure kernel size is odd and reasonable (max 201 to avoid performance issues)
+        effective_blur = min(effective_blur, 100)
+
+        # Apply multi-pass blur for smoother results on large images
+        kernel_size = effective_blur * 2 + 1
+        blurred = cv2.GaussianBlur(mask, (kernel_size, kernel_size), effective_blur)
+
+        # For large blurs, apply a second pass with smaller kernel for better gradient
+        if effective_blur > 20:
+            second_blur = effective_blur // 2
+            second_kernel = second_blur * 2 + 1
+            blurred = cv2.GaussianBlur(blurred, (second_kernel, second_kernel), second_blur)
+
+        logger.info(f"Applied adaptive blur: input_radius={blur_radius} -> effective_radius={effective_blur} (scale={scale_factor:.1f}x) for {width}x{height} image")
+        return blurred
     
     def _combine_masks(self, masks: List[np.ndarray]) -> np.ndarray:
         """

@@ -158,32 +158,49 @@ class ComfyUIHelper:
             # Prepare image for VAE
             vae_input = ComfyUIHelper.prepare_image_for_vae(image)
 
-            # Ensure tensor is contiguous and on correct device
-            vae_input = vae_input.contiguous()
-            if hasattr(vae, 'device'):
-                vae_input = vae_input.to(vae.device)
+            # Detect VAE dtype from first parameter
+            vae_dtype = None
+            vae_device = None
+
+            # Get VAE dtype and device
+            if hasattr(vae, 'first_stage_model'):
+                # Get dtype from first conv layer
+                for param in vae.first_stage_model.parameters():
+                    vae_dtype = param.dtype
+                    vae_device = param.device
+                    break
+            elif hasattr(vae, 'parameters'):
+                for param in vae.parameters():
+                    vae_dtype = param.dtype
+                    vae_device = param.device
+                    break
+
+            # Fallback to checking device attribute
+            if vae_device is None and hasattr(vae, 'device'):
+                vae_device = vae.device
 
             logger.info(f"VAE type: {type(vae).__name__}")
-            logger.info(f"VAE has first_stage_model: {hasattr(vae, 'first_stage_model')}")
-            logger.info(f"Encoding with VAE, input: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}, contiguous: {vae_input.is_contiguous()}")
+            logger.info(f"VAE dtype: {vae_dtype}, VAE device: {vae_device}")
+            logger.info(f"Input before conversion: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}")
+
+            # Convert to VAE's dtype and device
+            if vae_dtype is not None:
+                vae_input = vae_input.to(dtype=vae_dtype)
+            if vae_device is not None:
+                vae_input = vae_input.to(device=vae_device)
+
+            # Ensure contiguous after all conversions
+            vae_input = vae_input.contiguous()
+
+            logger.info(f"Input after conversion: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}, contiguous: {vae_input.is_contiguous()}")
             logger.info(f"Input tensor stride: {vae_input.stride()}")
 
             # Encode to latent space using ComfyUI VAE interface
             with torch.no_grad():
-                # ComfyUI VAEs have an encode method that takes pixels
+                # Use the vae.encode() method which handles the first_stage_model internally
                 if hasattr(vae, 'encode'):
-                    try:
-                        # First try the standard encode method
-                        logger.info("Calling vae.encode()...")
-                        latents = vae.encode(vae_input)
-                    except Exception as encode_error:
-                        logger.warning(f"vae.encode() failed: {encode_error}")
-                        # Try accessing first_stage_model if available
-                        if hasattr(vae, 'first_stage_model'):
-                            logger.info("Trying vae.first_stage_model.encode()...")
-                            latents = vae.first_stage_model.encode(vae_input)
-                        else:
-                            raise
+                    logger.info("Calling vae.encode()...")
+                    latents = vae.encode(vae_input)
 
                     # Handle different return types (some return distributions)
                     if hasattr(latents, 'latent_dist'):
@@ -195,7 +212,7 @@ class ComfyUIHelper:
                     logger.info("Using vae() call...")
                     latents = vae(vae_input)
 
-            logger.info(f"VAE encoding: {vae_input.shape} -> {latents.shape}")
+            logger.info(f"VAE encoding successful: {vae_input.shape} -> {latents.shape}")
             return latents
 
         except Exception as e:

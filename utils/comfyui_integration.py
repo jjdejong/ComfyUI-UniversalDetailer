@@ -158,42 +158,25 @@ class ComfyUIHelper:
             # Prepare image for VAE
             vae_input = ComfyUIHelper.prepare_image_for_vae(image)
 
-            # Detect VAE dtype from first parameter
-            vae_dtype = None
+            # Get VAE device (let ComfyUI handle dtype conversion)
             vae_device = None
-
-            # Get VAE dtype and device
-            if hasattr(vae, 'first_stage_model'):
-                # Get dtype from first conv layer
-                for param in vae.first_stage_model.parameters():
-                    vae_dtype = param.dtype
-                    vae_device = param.device
-                    break
-            elif hasattr(vae, 'parameters'):
-                for param in vae.parameters():
-                    vae_dtype = param.dtype
-                    vae_device = param.device
-                    break
-
-            # Fallback to checking device attribute
-            if vae_device is None and hasattr(vae, 'device'):
+            if hasattr(vae, 'load_device'):
+                vae_device = vae.load_device
+            elif hasattr(vae, 'device'):
                 vae_device = vae.device
 
             logger.info(f"VAE type: {type(vae).__name__}")
-            logger.info(f"VAE dtype: {vae_dtype}, VAE device: {vae_device}")
-            logger.info(f"Input before conversion: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}")
+            logger.info(f"Input tensor: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}")
 
-            # Convert to VAE's dtype and device
-            if vae_dtype is not None:
-                vae_input = vae_input.to(dtype=vae_dtype)
-            if vae_device is not None:
+            # Move to VAE device if needed, but keep float32 dtype
+            if vae_device is not None and vae_input.device != vae_device:
                 vae_input = vae_input.to(device=vae_device)
+                logger.info(f"Moved to device: {vae_device}")
 
-            # Ensure contiguous after all conversions
-            vae_input = vae_input.contiguous()
-
-            logger.info(f"Input after conversion: {vae_input.shape}, dtype: {vae_input.dtype}, device: {vae_input.device}, contiguous: {vae_input.is_contiguous()}")
-            logger.info(f"Input tensor stride: {vae_input.stride()}")
+            # Ensure contiguous memory layout (critical after permute)
+            if not vae_input.is_contiguous():
+                vae_input = vae_input.contiguous()
+                logger.info("Made tensor contiguous")
 
             # Encode to latent space using ComfyUI VAE interface
             with torch.no_grad():
@@ -236,33 +219,24 @@ class ComfyUIHelper:
             Image tensor (B, H, W, C)
         """
         try:
-            # Detect VAE dtype and device
-            vae_dtype = None
+            # Get VAE device (let ComfyUI handle dtype conversion)
             vae_device = None
-
-            if hasattr(vae, 'first_stage_model'):
-                for param in vae.first_stage_model.parameters():
-                    vae_dtype = param.dtype
-                    vae_device = param.device
-                    break
-            elif hasattr(vae, 'parameters'):
-                for param in vae.parameters():
-                    vae_dtype = param.dtype
-                    vae_device = param.device
-                    break
-
-            if vae_device is None and hasattr(vae, 'device'):
+            if hasattr(vae, 'load_device'):
+                vae_device = vae.load_device
+            elif hasattr(vae, 'device'):
                 vae_device = vae.device
 
-            # Convert latents to VAE's dtype and device
-            if vae_dtype is not None:
-                latents = latents.to(dtype=vae_dtype)
-            if vae_device is not None:
-                latents = latents.to(device=vae_device)
-
-            latents = latents.contiguous()
-
             logger.info(f"Decoding latents: {latents.shape}, dtype: {latents.dtype}, device: {latents.device}")
+
+            # Move to VAE device if needed, but keep original dtype
+            if vae_device is not None and latents.device != vae_device:
+                latents = latents.to(device=vae_device)
+                logger.info(f"Moved latents to device: {vae_device}")
+
+            # Ensure contiguous
+            if not latents.is_contiguous():
+                latents = latents.contiguous()
+                logger.info("Made latents contiguous")
 
             # Decode from latent space
             with torch.no_grad():

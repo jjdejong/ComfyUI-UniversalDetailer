@@ -120,17 +120,30 @@ Universal Detailer is an advanced ComfyUI custom node that extends FaceDetailer 
 
 ## Advanced Configuration
 
+### Multi-Model Detection System
+Universal Detailer **automatically selects and loads** the appropriate detection models based on your `target_parts` setting:
+
+- **Face detection**: Uses YOLOv8n-face (fast) or YOLOv8s-face (quality)
+- **Hand detection**: Uses hand_yolov8n model
+- **Simultaneous detection**: When `target_parts="face,hand"`, both models load and run
+
+**Model Quality Settings:**
+- `fast`: Fastest inference, lower accuracy (YOLOv8n models)
+- `balanced`: Balanced speed and accuracy (YOLOv8n for most parts)
+- `quality`: Best accuracy, slower (YOLOv8s for faces)
+
 ### Supported Models
+The node automatically manages these YOLO models:
 - **YOLOv8n-face**: Fast face detection (6.2MB)
-- **YOLOv8s-face**: High-accuracy face detection (22.5MB)  
+- **YOLOv8s-face**: High-accuracy face detection (22.5MB)
 - **hand_yolov8n**: Hand detection model (6.2MB)
-- **Custom models**: Support for user-defined YOLO models
 
 ### Performance Tuning
 ```python
 # Example configuration for optimal performance
 {
-    "detection_model": "yolov8n-face",    # Fastest option
+    "target_parts": "face,hand",          # Comma-separated parts to detect
+    "model_quality": "fast",              # fast/balanced/quality
     "confidence_threshold": 0.7,          # Balance accuracy/speed
     "mask_padding": 32,                   # Optimal padding
     "inpaint_strength": 0.8,              # Quality vs preservation

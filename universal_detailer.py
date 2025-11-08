@@ -71,17 +71,36 @@ def _get_cached_device_info() -> Dict[str, Any]:
 class UniversalDetailerNode:
     """
     Universal Detailer Node for ComfyUI
-    
+
     Production-ready implementation supporting multi-part detection and enhancement.
     Optimized for performance, memory efficiency, and reliability.
-    
+
     Capabilities:
     - Multi-part detection (face, hand, finger)
     - Advanced inpainting with ComfyUI integration
     - Memory-optimized batch processing
     - Comprehensive error handling
     """
-    
+
+    # Part-to-model mapping for automatic model selection
+    PART_MODEL_MAPPING = {
+        "face": {
+            "fast": "yolov8n-face",
+            "balanced": "yolov8n-face",
+            "quality": "yolov8s-face"
+        },
+        "hand": {
+            "fast": "hand_yolov8n",
+            "balanced": "hand_yolov8n",
+            "quality": "hand_yolov8n"
+        },
+        "finger": {
+            "fast": "hand_yolov8n",  # Hand model also detects fingers
+            "balanced": "hand_yolov8n",
+            "quality": "hand_yolov8n"
+        }
+    }
+
     @classmethod
     def INPUT_TYPES(cls) -> Dict[str, Dict[str, Any]]:
         """
@@ -99,13 +118,13 @@ class UniversalDetailerNode:
                 "negative": ("CONDITIONING",),
             },
             "optional": {
-                "detection_model": (
-                    ["yolov8n-face", "yolov8s-face", "hand_yolov8n"], 
-                    {"default": "yolov8n-face"}
-                ),
                 "target_parts": (
-                    "STRING", 
+                    "STRING",
                     {"default": "face,hand"}
+                ),
+                "model_quality": (
+                    ["fast", "balanced", "quality"],
+                    {"default": "fast"}
                 ),
                 "confidence_threshold": (
                     "FLOAT", 
@@ -202,8 +221,8 @@ class UniversalDetailerNode:
         vae: Any,
         positive: Any,
         negative: Any,
-        detection_model: str = "yolov8n-face",
         target_parts: str = "face,hand",
+        model_quality: str = "fast",
         confidence_threshold: float = 0.5,
         mask_padding: int = 32,
         inpaint_strength: float = 0.75,
@@ -271,13 +290,20 @@ class UniversalDetailerNode:
             start_time = time.time()
             logger.info("Starting Universal Detailer processing...")
             logger.info(f"Target parts: {target_parts}")
-            logger.info(f"Detection model: {detection_model}")
+            logger.info(f"Model quality: {model_quality}")
             logger.info(f"Confidence threshold: {confidence_threshold}")
-            
+
+            # Parse target parts
+            target_parts_list = [part.strip() for part in target_parts.split(",")]
+
+            # Determine which models to load based on target parts
+            models_to_load = self._get_required_models(target_parts_list, model_quality)
+            logger.info(f"Models to load: {models_to_load}")
+
             # Validate parameters
             validated_params = self._validate_parameters(
-                detection_model=detection_model,
                 target_parts=target_parts,
+                model_quality=model_quality,
                 confidence_threshold=confidence_threshold,
                 mask_padding=mask_padding,
                 inpaint_strength=inpaint_strength,
@@ -299,23 +325,22 @@ class UniversalDetailerNode:
                 if batch_size > optimal_batch_size:
                     logger.warning(f"Large batch size {batch_size} may cause memory issues. "
                                  f"Recommended: {optimal_batch_size}")
-            
-            # Parse target parts
-            target_parts_list = [part.strip() for part in target_parts.split(",")]
-            
-            # Load detection model with memory monitoring
+
+            # Load detection models with memory monitoring
             if memory_manager:
                 with memory_manager.memory_monitor("model loading"):
-                    detector = self._load_detection_model(detection_model)
+                    detectors = self._load_detection_models(models_to_load)
             else:
-                detector = self._load_detection_model(detection_model)
-                
-            if detector is None:
-                raise RuntimeError(f"Failed to load detection model: {detection_model}")
-            
+                detectors = self._load_detection_models(models_to_load)
+
+            if not detectors:
+                raise RuntimeError(f"Failed to load any detection models for parts: {target_parts_list}")
+
+            logger.info(f"Loaded {len(detectors)} detection model(s)")
+
             # Process images efficiently (batch or sequential based on memory)
             processed_results = self._process_batch_efficiently(
-                image, detector, target_parts_list, validated_params,
+                image, detectors, target_parts_list, validated_params,
                 model, vae, positive, negative, memory_manager, pbar
             )
             
@@ -335,7 +360,8 @@ class UniversalDetailerNode:
                 "processing_time": round(processing_time, 2),
                 "image_shape": [batch_size, height, width, channels],
                 "parameters": {
-                    "detection_model": detection_model,
+                    "detection_models": models_to_load,
+                    "model_quality": model_quality,
                     "target_parts": target_parts,
                     "confidence_threshold": confidence_threshold,
                     "mask_padding": mask_padding,
@@ -409,7 +435,74 @@ class UniversalDetailerNode:
                     empty_mask,
                     json.dumps(error_info, indent=2)
                 )
-    
+
+    def _get_required_models(self, target_parts: List[str], model_quality: str) -> Dict[str, str]:
+        """
+        Determine which detection models are needed based on target parts.
+
+        Args:
+            target_parts: List of target parts to detect (e.g., ["face", "hand"])
+            model_quality: Quality level ("fast", "balanced", "quality")
+
+        Returns:
+            Dict mapping part name to model name
+        """
+        required_models = {}
+
+        for part in target_parts:
+            part_lower = part.lower().strip()
+            if part_lower in self.PART_MODEL_MAPPING:
+                model_name = self.PART_MODEL_MAPPING[part_lower].get(model_quality, "fast")
+                required_models[part_lower] = model_name
+                logger.info(f"Part '{part_lower}' will use model: {model_name}")
+            else:
+                logger.warning(f"Unknown part type: '{part}', skipping")
+
+        return required_models
+
+    def _load_detection_models(self, models_to_load: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Load multiple detection models based on the models_to_load mapping.
+
+        Args:
+            models_to_load: Dict mapping part name to model name
+
+        Returns:
+            Dict mapping part name to loaded detector instance
+        """
+        detectors = {}
+
+        # Get unique model names (multiple parts might use same model)
+        unique_models = {}
+        for part, model_name in models_to_load.items():
+            if model_name not in unique_models:
+                unique_models[model_name] = []
+            unique_models[model_name].append(part)
+
+        logger.info(f"Loading {len(unique_models)} unique model(s) for {len(models_to_load)} part type(s)")
+
+        # Load each unique model once
+        loaded_models = {}
+        for model_name, parts in unique_models.items():
+            logger.info(f"Loading model '{model_name}' for parts: {parts}")
+            detector = self._load_detection_model(model_name)
+            if detector is not None:
+                loaded_models[model_name] = detector
+                logger.info(f"Successfully loaded model: {model_name}")
+            else:
+                logger.error(f"Failed to load model: {model_name}")
+
+        # Map detectors to part names
+        for part, model_name in models_to_load.items():
+            if model_name in loaded_models:
+                detectors[part] = {
+                    "detector": loaded_models[model_name],
+                    "model_name": model_name
+                }
+
+        logger.info(f"Successfully loaded detectors for {len(detectors)} part type(s)")
+        return detectors
+
     def _validate_parameters(self, **kwargs) -> Dict[str, Any]:
         """
         Validate and sanitize input parameters.
@@ -612,32 +705,51 @@ class UniversalDetailerNode:
         return device
     
     @profile_performance
-    def _detect_parts(self, image_np: np.ndarray, detector: YOLODetector, target_parts: List[str], confidence_threshold: float):
+    def _detect_parts(self, image_np: np.ndarray, detectors: Dict[str, Dict], target_parts: List[str], confidence_threshold: float):
         """
-        Detect target parts in the image.
-        
+        Detect target parts in the image using multiple specialized models.
+
         Args:
             image_np: Input image as numpy array
-            detector: Detection model instance
+            detectors: Dict mapping part name to detector info (detector instance and model name)
             target_parts: List of parts to detect
             confidence_threshold: Minimum confidence for detections
-        
+
         Returns:
-            List of detection results
+            List of detection results from all detectors combined
         """
         try:
             logger.info(f"Detecting parts: {target_parts} with confidence >= {confidence_threshold}")
-            
-            # Run detection
-            detections = detector.detect(
-                image_np,
-                confidence_threshold=confidence_threshold,
-                target_classes=target_parts
-            )
-            
-            logger.info(f"Detection completed, found {len(detections)} objects")
-            return detections
-            
+
+            all_detections = []
+
+            # Run detection for each part type with its specialized model
+            for part in target_parts:
+                part_lower = part.lower().strip()
+
+                if part_lower not in detectors:
+                    logger.warning(f"No detector available for part: {part_lower}")
+                    continue
+
+                detector_info = detectors[part_lower]
+                detector = detector_info["detector"]
+                model_name = detector_info["model_name"]
+
+                logger.info(f"Running {model_name} for detecting: {part_lower}")
+
+                # Run detection with this model
+                part_detections = detector.detect(
+                    image_np,
+                    confidence_threshold=confidence_threshold,
+                    target_classes=[part_lower]  # Only detect this specific part
+                )
+
+                logger.info(f"Found {len(part_detections)} {part_lower} detection(s)")
+                all_detections.extend(part_detections)
+
+            logger.info(f"Detection completed, found {len(all_detections)} total objects across all models")
+            return all_detections
+
         except Exception as e:
             logger.error(f"Error in part detection: {e}")
             return []
@@ -833,7 +945,7 @@ class UniversalDetailerNode:
     def _process_batch_efficiently(
         self,
         image: torch.Tensor,
-        detector,
+        detectors: Dict[str, Dict],
         target_parts_list: List[str],
         validated_params: Dict[str, Any],
         model,
@@ -845,10 +957,10 @@ class UniversalDetailerNode:
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, List[Dict]]:
         """
         Process batch of images efficiently based on available memory.
-        
+
         Args:
             image: Input image tensor (B, H, W, C)
-            detector: Detection model
+            detectors: Dict mapping part names to detector instances
             target_parts_list: List of target parts to detect
             validated_params: Validated processing parameters
             model: ComfyUI diffusion model
@@ -856,7 +968,8 @@ class UniversalDetailerNode:
             positive: Positive conditioning
             negative: Negative conditioning
             memory_manager: Optional memory manager
-            
+            pbar: Optional progress bar
+
         Returns:
             Tuple of processed results
         """
@@ -883,12 +996,12 @@ class UniversalDetailerNode:
                 
                 # Convert to numpy for detection
                 image_np = self._tensor_to_numpy(single_image[0])
-                
-                # Detect parts
+
+                # Detect parts using specialized models
                 detections = self._detect_parts(
-                    image_np, 
-                    detector, 
-                    target_parts_list, 
+                    image_np,
+                    detectors,  # Pass dict of detectors
+                    target_parts_list,
                     confidence_threshold
                 )
                 
